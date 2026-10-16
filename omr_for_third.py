@@ -1,8 +1,4 @@
-# analyze_head_turning_v3.py
-# -*- coding: utf-8 -*-
-"""
-v3: исправлены merge (dedup), stim_dir (парсинг из video), PSD (порог длины).
-"""
+
 
 import os
 import re
