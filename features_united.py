@@ -1,18 +1,16 @@
-# merge_frame_features.py
-# -*- coding: utf-8 -*-
 """
-Объединение нескольких CSV-файлов с покадровыми признаками
-(например, frame_features_c3h2_v2.csv, frame_features_cba3_v2.csv и т.п.)
-в один общий CSV для скрипта hmm_train_frames_all.py.
+Merge several frame-feature CSVs (e.g. frame_features_c3h2_v2.csv,
+frame_features_cba3_v2.csv, ...) into one combined CSV for
+hmm_train_frames_all.py.
 
-Скрипт можно запускать откуда угодно — он сам ищет файлы в папке,
-указанной в CONFIG ниже.
+The script can be run from anywhere: it looks for input files in the
+folder specified in CONFIG below.
 
-Группа (blind / sighted) определяется по префиксу имени видео:
+Group (blind / sighted) is derived from the video-name prefix:
     c3h* -> blind
     cba* -> sighted
-Столбцы mouse_parsed и group при необходимости пересчитываются,
-чтобы гарантировать корректность.
+Columns mouse_parsed and group are recomputed when requested so that
+their values are always consistent with the naming convention.
 """
 
 import os
@@ -20,33 +18,34 @@ import glob
 import pandas as pd
 
 # ============================================================
-# CONFIG  —  ЗДЕСЬ МЕНЯЙ ПУТИ
+# CONFIG  —  EDIT PATHS HERE
 # ============================================================
 
-# Папка, в которой лежат исходные CSV (например, frame_features_c3h2_v2.csv, ...)
+# Folder that contains the source CSVs
+# (e.g. frame_features_c3h2_v2.csv, ...)
 INPUT_DIR = r"C:\Users\90108\OneDrive\Рабочий стол\v\agouty\frame_features10"
 
-# Маска для поиска файлов в INPUT_DIR
+# Glob pattern used to find the input files inside INPUT_DIR
 PATTERN = "frame_features_*.csv"
 
-# Куда сохранить объединённый файл (полный путь)
+# Output file (full path, including file name)
 OUTPUT_FILE = r"C:\Users\90108\OneDrive\Рабочий стол\v\agouty\frame_features\frame_features10.csv"
 
-# Пересчитывать ли mouse_parsed и group по имени видео
+# Whether to recompute mouse_parsed and group from the video name
 RECOMPUTE_GROUP = True
 
-# Префиксы видео -> группа
+# Video-name prefix -> group
 GROUP_BY_PREFIX = {
     "c3h": "blind",
     "cba": "sighted",
 }
 
 # ============================================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# HELPERS
 # ============================================================
 
 def get_group_from_video(video_name: str) -> str:
-    """Возвращает 'blind', 'sighted' или 'unknown' по префиксу видео."""
+    """Return 'blind', 'sighted' or 'unknown' based on the video prefix."""
     if not isinstance(video_name, str):
         return "unknown"
     name = video_name.strip().lower()
@@ -57,14 +56,14 @@ def get_group_from_video(video_name: str) -> str:
 
 
 def get_mouse_from_video(video_name: str) -> str:
-    """Извлекает имя мыши из имени видео (часть до первого '_')."""
+    """Extract the mouse id from the video name (part before the first '_')."""
     if not isinstance(video_name, str):
         return "unknown"
     return video_name.split("_")[0]
 
 
 # ============================================================
-# ОСНОВНАЯ ЛОГИКА
+# MAIN LOGIC
 # ============================================================
 
 def merge_csvs(input_dir: str,
@@ -76,40 +75,40 @@ def merge_csvs(input_dir: str,
 
     if not files:
         raise FileNotFoundError(
-            f"Не найдено ни одного файла по шаблону: {search_path}\n"
-            f"Проверь INPUT_DIR и PATTERN в CONFIG."
+            f"No files matched the pattern: {search_path}\n"
+            f"Check INPUT_DIR and PATTERN in CONFIG."
         )
 
-    print(f"Папка поиска: {input_dir}")
-    print(f"Маска:        {pattern}")
-    print(f"Найдено {len(files)} файлов:")
+    print(f"Search folder: {input_dir}")
+    print(f"Pattern:       {pattern}")
+    print(f"Found {len(files)} files:")
     for f in files:
         print(f"  {os.path.basename(f)}")
 
     dfs = []
     for f in files:
-        print(f"Чтение: {os.path.basename(f)} ...", end=" ")
+        print(f"Reading: {os.path.basename(f)} ...", end=" ")
         try:
             df = pd.read_csv(f, sep=";", decimal=",")
         except Exception as e:
-            print(f"ОШИБКА: {e}")
+            print(f"ERROR: {e}")
             continue
-        print(f"{len(df)} строк")
+        print(f"{len(df)} rows")
         dfs.append(df)
 
     if not dfs:
-        raise RuntimeError("Не удалось прочитать ни одного файла.")
+        raise RuntimeError("Could not read any of the input files.")
 
     merged = pd.concat(dfs, ignore_index=True, sort=False)
-    print(f"\nВсего строк после объединения: {len(merged)}")
+    print(f"\nTotal rows after concatenation: {len(merged)}")
 
     required = ["video", "frame", "time_s"]
     for col in required:
         if col not in merged.columns:
-            raise KeyError(f"В объединённых данных отсутствует столбец '{col}'")
+            raise KeyError(f"Column '{col}' is missing in the merged data")
 
     if recompute_group:
-        print("Пересчёт mouse_parsed и group по имени видео...")
+        print("Recomputing mouse_parsed and group from video names...")
         merged["mouse_parsed"] = merged["video"].apply(get_mouse_from_video)
         merged["group"] = merged["video"].apply(get_group_from_video)
 
@@ -125,22 +124,22 @@ def merge_csvs(input_dir: str,
     other_cols = [c for c in merged.columns if c not in ordered_cols]
     merged = merged[ordered_cols + other_cols]
 
-    # Создаём папку для выходного файла, если её нет
+    # Create the output folder if it does not exist yet
     out_dir = os.path.dirname(os.path.abspath(output_file))
     os.makedirs(out_dir, exist_ok=True)
 
     merged.to_csv(output_file, sep=";", decimal=",", index=False)
-    print(f"\nРезультат сохранён в: {os.path.abspath(output_file)}")
-    print(f"Столбцы: {list(merged.columns)}")
-    print(f"Строк: {len(merged)}")
-    print("Группы:")
+    print(f"\nResult saved to: {os.path.abspath(output_file)}")
+    print(f"Columns: {list(merged.columns)}")
+    print(f"Rows: {len(merged)}")
+    print("Groups:")
     print(merged["group"].value_counts().to_string())
-    print("Мыши:")
+    print("Mice:")
     print(merged["mouse_parsed"].value_counts().to_string())
 
 
 # ============================================================
-# ЗАПУСК
+# ENTRY POINT
 # ============================================================
 
 if __name__ == "__main__":
