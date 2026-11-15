@@ -221,8 +221,12 @@ for folder in subfolders:
             print(f"    WARNING: missing expected columns (x={has_x}, y={has_y}, lik={has_lik})")
             print(f"    Columns: {df.columns.tolist()[:10]}")
 
+       
         # ---- add video and frame columns ----
-        video_name = os.path.splitext(os.path.basename(file))[0]
+        raw_name = os.path.splitext(os.path.basename(file))[0]
+        # Strip DLC suffix and trailing "_filtered" to recover the original video stem
+        video_name = re.split(r"DLC_", raw_name, maxsplit=1, flags=re.IGNORECASE)[0]
+        video_name = re.sub(r"_filtered$", "", video_name, flags=re.IGNORECASE)
 
         if "video" in df.columns:
             df = df.drop(columns=["video"])
